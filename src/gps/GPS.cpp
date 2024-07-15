@@ -400,6 +400,12 @@ bool GPS::setup()
     int msglen = 0;
 
     if (!didSerialInit) {
+#ifdef GNSS_Airoha 
+    if (tx_gpio && gnssModel == GNSS_MODEL_UNKNOWN) {
+        probe(GPS_BAUDRATE);
+        LOG_INFO("GPS setting to %d.\n", GPS_BAUDRATE);
+    }
+#else
 #if !defined(GPS_UC6580)
 
         if (tx_gpio && gnssModel == GNSS_MODEL_UNKNOWN) {
@@ -772,6 +778,7 @@ bool GPS::setup()
                 LOG_INFO("GNSS module configuration saved!\n");
             }
         }
+#endif
         didSerialInit = true;
     }
 

@@ -7,6 +7,7 @@
 #include "mesh/mesh-pb-constants.h"
 #include <bluefruit.h>
 #include <utility/bonding.h>
+#include "BLEDfuSecure.h"
 static BLEService meshBleService = BLEService(BLEUuid(MESH_SERVICE_UUID_16));
 static BLECharacteristic fromNum = BLECharacteristic(BLEUuid(FROMNUM_UUID_16));
 static BLECharacteristic fromRadio = BLECharacteristic(BLEUuid(FROMRADIO_UUID_16));
@@ -17,6 +18,7 @@ static BLEDis bledis; // DIS (Device Information Service) helper class instance
 static BLEBas blebas; // BAS (Battery Service) helper class instance
 
 static BLEDfu bledfu; // DFU software update helper service
+static BLEDfuSecure bledfusecure; // DFU software update helper service
 // This scratch buffer is used for various bluetooth reads/writes - but it is safe because only one bt operation can be in
 // process at once
 // static uint8_t trBytes[_max(_max(_max(_max(ToRadio_size, RadioConfig_size), User_size), MyNodeInfo_size), FromRadio_size)];
@@ -247,8 +249,10 @@ void NRF52Bluetooth::setup()
     // Set the connect/disconnect callback handlers
     Bluefruit.Periph.setConnectCallback(onConnect);
     Bluefruit.Periph.setDisconnectCallback(onDisconnect);
-    bledfu.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
-    bledfu.begin(); // Install the DFU helper
+    // bledfu.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
+    // bledfu.begin(); // Install the DFU helper
+    bledfusecure.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); 
+    bledfusecure.begin(); // Install the DFU helper
     // Configure and Start the Device Information Service
     LOG_INFO("Configuring the Device Information Service\n");
     bledis.setModel(optstr(HW_VERSION));

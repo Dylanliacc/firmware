@@ -151,9 +151,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
     LOG_DEBUG("Scanning for I2C devices on port %d\n", port);
 
     uint8_t err;
-
     DeviceAddress addr(port, 0x00);
-
     uint16_t registerValue = 0x00;
     ScanI2C::DeviceType type;
     TwoWire *i2cBus;
@@ -189,7 +187,6 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
         type = NONE;
         if (err == 0) {
             LOG_DEBUG("I2C device found at address 0x%x\n", addr.address);
-
             switch (addr.address) {
             case SSD1306_ADDRESS:
                 type = probeOLED(addr);
@@ -214,7 +211,6 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
 
 #ifdef RV3028_RTC
             case RV3028_RTC:
-                // foundDevices[addr] = RTC_RV3028;
                 type = RTC_RV3028;
                 LOG_INFO("RV3028 RTC found\n");
                 rtc.initI2C(*i2cBus);
@@ -228,10 +224,8 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
 #endif
 
             case CARDKB_ADDR:
-                // Do we have the RAK14006 instead?
                 registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x04), 1);
                 if (registerValue == 0x02) {
-                    // KEYPAD_VERSION
                     LOG_INFO("RAK14004 found\n");
                     type = RAK14004;
                 } else {
@@ -251,7 +245,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
 #endif
             case BME_ADDR:
             case BME_ADDR_ALTERNATE:
-                registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0xD0), 1); // GET_ID
+                registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0xD0), 1);
                 switch (registerValue) {
                 case 0x61:
                     LOG_INFO("BME-680 sensor found at address 0x%x\n", (uint8_t)addr.address);
@@ -284,7 +278,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                 if (registerValue == 0x5449) {
                     LOG_INFO("INA260 sensor found at address 0x%x\n", (uint8_t)addr.address);
                     type = INA260;
-                } else { // Assume INA219 if INA260 ID is not found
+                } else {
                     LOG_INFO("INA219 sensor found at address 0x%x\n", (uint8_t)addr.address);
                     type = INA219;
                 }
@@ -309,9 +303,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                     type = LIS3DH;
                     LOG_INFO("LIS3DH accelerometer found\n");
                 }
-
                 break;
-
             case SHT31_4x_ADDR:
                 registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x89), 2);
                 if (registerValue == 0x11a2 || registerValue == 0x11da) {
@@ -324,25 +316,20 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                     type = SHT31;
                     LOG_INFO("SHT31 sensor found\n");
                 }
-
                 break;
-
                 SCAN_SIMPLE_CASE(SHTC3_ADDR, SHTC3, "SHTC3 sensor found\n")
                 SCAN_SIMPLE_CASE(RCWL9620_ADDR, RCWL9620, "RCWL9620 sensor found\n")
-
             case LPS22HB_ADDR_ALT:
                 SCAN_SIMPLE_CASE(LPS22HB_ADDR, LPS22HB, "LPS22HB sensor found\n")
-
                 SCAN_SIMPLE_CASE(QMC6310_ADDR, QMC6310, "QMC6310 Highrate 3-Axis magnetic sensor found\n")
-
             case QMI8658_ADDR:
-                registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x0A), 1); // get ID
+                registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x0A), 1);
                 if (registerValue == 0xC0) {
                     type = BQ24295;
                     LOG_INFO("BQ24295 PMU found\n");
                     break;
                 }
-                registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x0F), 1); // get ID
+                registerValue = getRegisterValue(ScanI2CTwoWire::RegisterLocation(addr, 0x0F), 1);
                 if (registerValue == 0x6A) {
                     type = LSM6DS3;
                     LOG_INFO("LSM6DS3 accelerometer found at address 0x%x\n", (uint8_t)addr.address);
@@ -351,9 +338,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                     LOG_INFO("QMI8658 Highrate 6-Axis inertial measurement sensor found\n");
                 }
                 break;
-
                 SCAN_SIMPLE_CASE(QMC5883L_ADDR, QMC5883L, "QMC5883L Highrate 3-Axis magnetic sensor found\n")
-
                 SCAN_SIMPLE_CASE(PMSA0031_ADDR, PMSA0031, "PMSA0031 air quality sensor found\n")
                 SCAN_SIMPLE_CASE(MPU6050_ADDR, MPU6050, "MPU6050 accelerometer found\n");
                 SCAN_SIMPLE_CASE(BMX160_ADDR, BMX160, "BMX160 accelerometer found\n");
@@ -365,7 +350,6 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                 SCAN_SIMPLE_CASE(OPT3001_ADDR, OPT3001, "OPT3001 light sensor found\n");
                 SCAN_SIMPLE_CASE(MLX90632_ADDR, MLX90632, "MLX90632 IR temp sensor found\n");
                 SCAN_SIMPLE_CASE(NAU7802_ADDR, NAU7802, "NAU7802 based scale found\n");
-
             default:
                 LOG_INFO("Device found at address 0x%x was not able to be enumerated\n", addr.address);
             }

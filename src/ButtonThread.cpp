@@ -41,6 +41,13 @@ ButtonThread::ButtonThread() : OSThread("Button")
     }
 #elif defined(BUTTON_PIN)
     int pin = config.device.button_gpio ? config.device.button_gpio : BUTTON_PIN; // Resolved button pin
+
+#ifdef BUTTON_ACTIVE_LOW 
+    this->userButton = OneButton(pin, BUTTON_ACTIVE_LOW, BUTTON_ACTIVE_PULLUP);
+#else
+    this->userButton = OneButton(pin, true, true);
+#endif
+
 #if defined(HELTEC_CAPSULE_SENSOR_V3)
     this->userButton = OneButton(pin, false, false);
 #else
@@ -51,7 +58,11 @@ ButtonThread::ButtonThread() : OSThread("Button")
 
 #ifdef INPUT_PULLUP_SENSE
     // Some platforms (nrf52) have a SENSE variant which allows wake from sleep - override what OneButton did
+#ifdef BUTTON_SENSE_TYPE // change by WayenWeng
+    pinMode(pin, BUTTON_SENSE_TYPE);
+#else
     pinMode(pin, INPUT_PULLUP_SENSE);
+#endif
 #endif
 
 #if defined(BUTTON_PIN) || defined(ARCH_PORTDUINO)
