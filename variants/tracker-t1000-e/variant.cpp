@@ -61,4 +61,7 @@ void initVariant()
     digitalWrite(GPS_RTC_INT, LOW);
 
     pinMode(GPS_RESETB_OUT, INPUT);
+
+    pinMode(ACCEL_EN, OUTPUT);
+    digitalWrite(ACCEL_EN, HIGH);
 }

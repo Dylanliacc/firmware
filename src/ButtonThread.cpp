@@ -10,8 +10,13 @@
 #include "main.h"
 #include "modules/ExternalNotificationModule.h"
 #include "power.h"
+#include "detect/ScanI2CTwoWire.h"
+#include "QMA6100P.h"
+#include <Wire.h>
+
 #ifdef ARCH_PORTDUINO
 #include "platform/portduino/PortduinoGlue.h"
+
 #endif
 
 #define DEBUG_BUTTONS 0
@@ -34,7 +39,8 @@ ButtonThread::ButtonThread() : OSThread("Button")
 #if defined(BUTTON_PIN) || defined(ARCH_PORTDUINO)
 
 #if defined(ARCH_PORTDUINO)
-    if (settingsMap.count(user) != 0 && settingsMap[user] != RADIOLIB_NC) {
+    if (settingsMap.count(user) != 0 && settingsMap[user] != RADIOLIB_NC)
+    {
         this->userButton = OneButton(settingsMap[user], true, true);
         LOG_DEBUG("Using GPIO%02d for button\n", settingsMap[user]);
     }
@@ -66,7 +72,7 @@ ButtonThread::ButtonThread() : OSThread("Button")
     userButton.setDebounceMs(1);
     userButton.attachDoubleClick(userButtonDoublePressed);
     userButton.attachMultiClick(userButtonMultiPressed, this); // Reference to instance: get click count from non-static OneButton
-#ifndef T_DECK // T-Deck immediately wakes up after shutdown, so disable this function
+#ifndef T_DECK                                                 // T-Deck immediately wakes up after shutdown, so disable this function
     userButton.attachLongPressStart(userButtonPressedLongStart);
     userButton.attachLongPressStop(userButtonPressedLongStop);
 #endif
@@ -99,6 +105,7 @@ ButtonThread::ButtonThread() : OSThread("Button")
 
 int32_t ButtonThread::runOnce()
 {
+
     // If the button is pressed we suppress CPU sleep until release
     canSleep = true; // Assume we should not keep the board awake
 
@@ -106,7 +113,8 @@ int32_t ButtonThread::runOnce()
     userButton.tick();
     canSleep &= userButton.isIdle();
 #elif defined(ARCH_PORTDUINO)
-    if (settingsMap.count(user) != 0 && settingsMap[user] != RADIOLIB_NC) {
+    if (settingsMap.count(user) != 0 && settingsMap[user] != RADIOLIB_NC)
+    {
         userButton.tick();
         canSleep &= userButton.isIdle();
     }
@@ -120,33 +128,49 @@ int32_t ButtonThread::runOnce()
     canSleep &= userButtonTouch.isIdle();
 #endif
 
-    if (btnEvent != BUTTON_EVENT_NONE) {
-        switch (btnEvent) {
-        case BUTTON_EVENT_PRESSED: {
+    if (btnEvent != BUTTON_EVENT_NONE)
+    {
+        switch (btnEvent)
+        {
+        case BUTTON_EVENT_PRESSED:
+        {
             LOG_BUTTON("press!\n");
 #ifdef BUTTON_PIN
             if (((config.device.button_gpio ? config.device.button_gpio : BUTTON_PIN) !=
                  moduleConfig.canned_message.inputbroker_pin_press) ||
                 !(moduleConfig.canned_message.updown1_enabled || moduleConfig.canned_message.rotary1_enabled) ||
-                !moduleConfig.canned_message.enabled) {
+                !moduleConfig.canned_message.enabled)
+            {
                 powerFSM.trigger(EVENT_PRESS);
             }
 #endif
 #if defined(ARCH_PORTDUINO)
             if ((settingsMap.count(user) != 0 && settingsMap[user] != RADIOLIB_NC) &&
                     (settingsMap[user] != moduleConfig.canned_message.inputbroker_pin_press) ||
-                !moduleConfig.canned_message.enabled) {
+                !moduleConfig.canned_message.enabled)
+            {
                 powerFSM.trigger(EVENT_PRESS);
             }
 #endif
             break;
         }
 
-        case BUTTON_EVENT_DOUBLE_PRESSED: {
+        case BUTTON_EVENT_DOUBLE_PRESSED:
+        {
             LOG_BUTTON("Double press!\n");
             service->refreshLocalMeshNode();
             auto sentPosition = service->trySendPosition(NODENUM_BROADCAST, true);
-            if (screen) {
+            if (scan_qma6100p)
+            {
+                LOG_INFO("QMA6100P accelerometer found\n");
+            }
+            else
+            {
+                LOG_WARN("QMA6100P accelerometer not found\n");
+            }
+
+            if (screen)
+            {
                 if (sentPosition)
                     screen->print("Sent ad-hoc position\n");
                 else
@@ -156,13 +180,16 @@ int32_t ButtonThread::runOnce()
             break;
         }
 
-        case BUTTON_EVENT_MULTI_PRESSED: {
+        case BUTTON_EVENT_MULTI_PRESSED:
+        {
             LOG_BUTTON("Mulitipress! %hux\n", multipressClickCount);
-            switch (multipressClickCount) {
+            switch (multipressClickCount)
+            {
 #if HAS_GPS
             // 3 clicks: toggle GPS
             case 3:
-                if (!config.device.disable_triple_click && (gps != nullptr)) {
+                if (!config.device.disable_triple_click && (gps != nullptr))
+                {
                     gps->toggleGpsMode();
                     if (screen)
                         screen->forceDisplay(true); // Force a new UI frame, then force an EInk update
@@ -183,10 +210,12 @@ int32_t ButtonThread::runOnce()
             break;
         } // end multipress event
 
-        case BUTTON_EVENT_LONG_PRESSED: {
+        case BUTTON_EVENT_LONG_PRESSED:
+        {
             LOG_BUTTON("Long press!\n");
             powerFSM.trigger(EVENT_PRESS);
-            if (screen) {
+            if (screen)
+            {
                 screen->startAlert("Shutting down...");
             }
             playBeep();
@@ -195,7 +224,8 @@ int32_t ButtonThread::runOnce()
 
         // Do actual shutdown when button released, otherwise the button release
         // may wake the board immediatedly.
-        case BUTTON_EVENT_LONG_RELEASED: {
+        case BUTTON_EVENT_LONG_RELEASED:
+        {
             LOG_INFO("Shutdown from long press\n");
             playShutdownMelody();
             delay(3000);
@@ -204,9 +234,11 @@ int32_t ButtonThread::runOnce()
         }
 
 #ifdef BUTTON_PIN_TOUCH
-        case BUTTON_EVENT_TOUCH_LONG_PRESSED: {
+        case BUTTON_EVENT_TOUCH_LONG_PRESSED:
+        {
             LOG_BUTTON("Touch press!\n");
-            if (screen) {
+            if (screen)
+            {
                 // Wake if asleep
                 if (powerFSM.getState() == &stateDARK)
                     powerFSM.trigger(EVENT_PRESS);
@@ -240,7 +272,8 @@ void ButtonThread::attachButtonInterrupts()
     // Interrupt for user button, during normal use. Improves responsiveness.
     attachInterrupt(
         config.device.button_gpio ? config.device.button_gpio : BUTTON_PIN,
-        []() {
+        []()
+        {
             ButtonThread::userButton.tick();
             runASAP = true;
             BaseType_t higherWake = 0;
@@ -288,7 +321,8 @@ void ButtonThread::wakeOnIrq(int irq, int mode)
 {
     attachInterrupt(
         irq,
-        [] {
+        []
+        {
             BaseType_t higherWake = 0;
             mainDelay.interruptFromISR(&higherWake);
             runASAP = true;
@@ -317,14 +351,16 @@ void ButtonThread::storeClickCount()
 
 void ButtonThread::userButtonPressedLongStart()
 {
-    if (millis() > c_holdOffTime) {
+    if (millis() > c_holdOffTime)
+    {
         btnEvent = BUTTON_EVENT_LONG_PRESSED;
     }
 }
 
 void ButtonThread::userButtonPressedLongStop()
 {
-    if (millis() > c_holdOffTime) {
+    if (millis() > c_holdOffTime)
+    {
         btnEvent = BUTTON_EVENT_LONG_RELEASED;
     }
 }

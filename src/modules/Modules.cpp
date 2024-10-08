@@ -158,8 +158,8 @@ void setupModules()
         }
 #endif
 
-        cardKbI2cImpl = new CardKbI2cImpl();
-        cardKbI2cImpl->init();
+        // cardKbI2cImpl = new CardKbI2cImpl();
+        // cardKbI2cImpl->init();
 #ifdef INPUTBROKER_MATRIX_TYPE
         kbMatrixImpl = new KbMatrixImpl();
         kbMatrixImpl->init();

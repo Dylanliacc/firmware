@@ -3,6 +3,7 @@
 #include "OneButton.h"
 #include "concurrency/OSThread.h"
 #include "configuration.h"
+#include "detect/ScanI2CTwoWire.h"
 
 #ifndef BUTTON_CLICK_MS
 #define BUTTON_CLICK_MS 250
@@ -18,10 +19,11 @@
 
 class ButtonThread : public concurrency::OSThread
 {
-  public:
+public:
     static const uint32_t c_holdOffTime = 30000; // hold off 30s after boot
 
-    enum ButtonEventType {
+    enum ButtonEventType
+    {
         BUTTON_EVENT_NONE,
         BUTTON_EVENT_PRESSED,
         BUTTON_EVENT_DOUBLE_PRESSED,
@@ -37,7 +39,7 @@ class ButtonThread : public concurrency::OSThread
     void detachButtonInterrupts();
     void storeClickCount();
 
-  private:
+private:
 #if defined(BUTTON_PIN) || defined(ARCH_PORTDUINO)
     static OneButton userButton; // Static - accessed from an interrupt
 #endif
