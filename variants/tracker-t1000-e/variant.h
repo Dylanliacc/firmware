@@ -62,8 +62,13 @@ extern "C" {
 #define WIRE_INTERFACES_COUNT 1
 
 // unused pins
-#define PIN_WIRE_SDA (0 + 9)  // P0.26
-#define PIN_WIRE_SCL (0 + 10) // P0.27
+// #define PIN_WIRE_SDA (0 + 9)  // P0.26 
+// #define PIN_WIRE_SCL (0 + 10) // P0.27
+
+#define HAS_QMA6100P 1
+#define PIN_WIRE_SDA (0 + 26)  // P0.26 
+#define PIN_WIRE_SCL (0 + 27) // P0.27
+#define ACCEL_INT1 (32 + 2)   // P1.02  
 
 /*
  * Serial interfaces
