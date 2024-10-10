@@ -15,6 +15,13 @@
 #define XPOWERS_AXP192_AXP2101_ADDRESS 0x34
 #endif
 
+#ifdef HAS_QMA6100P
+#include "QMA6100P.h"
+
+QMA6100P qmaAccel;
+bool qma6100p_found = false;    
+#endif
+
 bool in_array(uint8_t *array, int size, uint8_t lookfor)
 {
     int i;
@@ -178,6 +185,7 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
                 continue;
             LOG_DEBUG("Scanning address 0x%x\n", addr.address);
         }
+        delay(200);
         i2cBus->beginTransmission(addr.address);
 #ifdef ARCH_PORTDUINO
         if (i2cBus->read() != -1)
@@ -195,7 +203,18 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
             case SSD1306_ADDRESS:
                 type = probeOLED(addr);
                 break;
-
+            case QMA6100P_ADDR:
+                if (qmaAccel.getUniqueID() == QMA6100P_CHIP_ID)
+                {
+                    LOG_INFO("QMA6100P accelerometer found\n");
+                    type = QMA6100P;
+                    qma6100p_found = true;
+                }
+                else
+                {
+                    LOG_WARN("QMA6100P initialization failed\n");
+                }
+                break;
 #if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
             case ATECC608B_ADDR:
 #ifdef RP2040_SLOW_CLOCK
@@ -393,7 +412,9 @@ void ScanI2CTwoWire::scanPort(I2CPort port, uint8_t *address, uint8_t asize)
 
                 SCAN_SIMPLE_CASE(QMC5883L_ADDR, QMC5883L, "QMC5883L Highrate 3-Axis magnetic sensor found\n")
                 SCAN_SIMPLE_CASE(HMC5883L_ADDR, HMC5883L, "HMC5883L 3-Axis digital compass found\n")
+#ifndef HAS_QMA6100P
                 SCAN_SIMPLE_CASE(PMSA0031_ADDR, PMSA0031, "PMSA0031 air quality sensor found\n")
+#endif
                 SCAN_SIMPLE_CASE(BMA423_ADDR, BMA423, "BMA423 accelerometer found\n");
                 SCAN_SIMPLE_CASE(LSM6DS3_ADDR, LSM6DS3, "LSM6DS3 accelerometer found at address 0x%x\n", (uint8_t)addr.address);
                 SCAN_SIMPLE_CASE(TCA9535_ADDR, TCA9535, "TCA9535 I2C expander found\n");

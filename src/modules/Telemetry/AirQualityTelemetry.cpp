@@ -31,7 +31,7 @@ int32_t AirQualityTelemetryModule::runOnce()
     if (firstTime) {
         // This is the first time the OSThread library has called this function, so do some setup
         firstTime = false;
-
+#ifndef HAS_QMA6100P
         if (moduleConfig.telemetry.air_quality_enabled) {
             LOG_INFO("Air quality Telemetry: Initializing\n");
             if (!aqi.begin_I2C()) {
@@ -55,6 +55,7 @@ int32_t AirQualityTelemetryModule::runOnce()
             }
             return 1000;
         }
+#endif
         return disable();
     } else {
         // if we somehow got to a second run of this module with measurement disabled, then just wait forever

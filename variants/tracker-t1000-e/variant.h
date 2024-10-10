@@ -68,6 +68,7 @@ extern "C" {
 #define HAS_QMA6100P 1
 #define PIN_WIRE_SDA (0 + 26)  // P0.26 
 #define PIN_WIRE_SCL (0 + 27) // P0.27
+#define PIN_3V3_ACCEL_EN (32 + 7) // P1.7, Power to Acc
 #define ACCEL_INT1 (32 + 2)   // P1.02  
 
 /*
@@ -142,10 +143,13 @@ extern "C" {
 #define PIN_BUZZER (0 + 25)    // P0.25, pwm output
 
 #define T1000X_SENSOR_EN
+
 #define T1000X_VCC_PIN (0 + 4)  // P0.4
 #define T1000X_NTC_PIN (0 + 31) // P0.31
 #define T1000X_LUX_PIN (0 + 29) // P0.29
 
+#define SENSOR_POWER_CTRL_PIN PIN_3V3_ACCEL_EN
+#define SENSOR_POWER_ON HIGH
 #ifdef __cplusplus
 }
 #endif
