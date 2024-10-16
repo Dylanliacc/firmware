@@ -97,6 +97,9 @@ class AccelerometerThread : public concurrency::OSThread
         case ScanI2C::DeviceType::ICM20948:
             sensor = new ICM20948Sensor(device);
             break;
+        case ScanI2C::DeviceType::QMA6100P:
+            sensor =new QMA6100PSensor(device);
+            break;
         default:
             disable();
             return;

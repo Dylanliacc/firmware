@@ -161,9 +161,10 @@ void setupModules()
             scanAndSelectInput = nullptr;
         }
 #endif
-
+#ifndef HAS_QMA6100P
         cardKbI2cImpl = new CardKbI2cImpl();
         cardKbI2cImpl->init();
+#endif
 #ifdef INPUTBROKER_MATRIX_TYPE
         kbMatrixImpl = new KbMatrixImpl();
         kbMatrixImpl->init();
