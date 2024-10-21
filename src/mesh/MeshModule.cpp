@@ -55,7 +55,7 @@ meshtastic_MeshPacket *MeshModule::allocAckNak(meshtastic_Routing_Error err, Nod
     p->decoded.request_id = idFrom;
     p->channel = chIndex;
     if (err != meshtastic_Routing_Error_NONE)
-        LOG_ERROR("Alloc an err=%d,to=0x%x,idFrom=0x%x,id=0x%x\n", err, to, idFrom, p->id);
+        LOG_WARN("Alloc an err=%d,to=0x%x,idFrom=0x%x,id=0x%x\n", err, to, idFrom, p->id);
 
     return p;
 }
@@ -86,7 +86,7 @@ void MeshModule::callModules(meshtastic_MeshPacket &mp, RxSource src)
 
     // Was this message directed to us specifically?  Will be false if we are sniffing someone elses packets
     auto ourNodeNum = nodeDB->getNodeNum();
-    bool toUs = mp.to == NODENUM_BROADCAST || mp.to == ourNodeNum;
+    bool toUs = mp.to == NODENUM_BROADCAST || isToUs(&mp);
 
     for (auto i = modules->begin(); i != modules->end(); ++i) {
         auto &pi = **i;
@@ -141,8 +141,7 @@ void MeshModule::callModules(meshtastic_MeshPacket &mp, RxSource src)
                 // because currently when the phone sends things, it sends things using the local node ID as the from address.  A
                 // better solution (FIXME) would be to let phones have their own distinct addresses and we 'route' to them like
                 // any other node.
-                if (isDecoded && mp.decoded.want_response && toUs && (getFrom(&mp) != ourNodeNum || mp.to == ourNodeNum) &&
-                    !currentReply) {
+                if (isDecoded && mp.decoded.want_response && toUs && (!isFromUs(&mp) || isToUs(&mp)) && !currentReply) {
                     pi.sendResponse(mp);
                     ignoreRequest = ignoreRequest || pi.ignoreRequest; // If at least one module asks it, we may ignore a request
                     LOG_INFO("Asked module '%s' to send a response\n", pi.name);
@@ -170,7 +169,7 @@ void MeshModule::callModules(meshtastic_MeshPacket &mp, RxSource src)
     if (isDecoded && mp.decoded.want_response && toUs) {
         if (currentReply) {
             printPacket("Sending response", currentReply);
-            service.sendToMesh(currentReply);
+            service->sendToMesh(currentReply);
             currentReply = NULL;
         } else if (mp.from != ourNodeNum && !ignoreRequest) {
             // Note: if the message started with the local node or a module asked to ignore the request, we don't want to send a
@@ -241,7 +240,7 @@ std::vector<MeshModule *> MeshModule::GetMeshModulesWithUIFrames()
         for (auto i = modules->begin(); i != modules->end(); ++i) {
             auto &pi = **i;
             if (pi.wantUIFrame()) {
-                LOG_DEBUG("Module wants a UI Frame\n");
+                LOG_DEBUG("%s wants a UI Frame\n", pi.name);
                 modulesWithUIFrames.push_back(&pi);
             }
         }
@@ -256,7 +255,7 @@ void MeshModule::observeUIEvents(Observer<const UIFrameEvent *> *observer)
             auto &pi = **i;
             Observable<const UIFrameEvent *> *observable = pi.getUIFrameObservable();
             if (observable != NULL) {
-                LOG_DEBUG("Module wants a UI Frame\n");
+                LOG_DEBUG("%s wants a UI Frame\n", pi.name);
                 observer->observe(observable);
             }
         }

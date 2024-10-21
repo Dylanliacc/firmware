@@ -1,4 +1,5 @@
 #include "NRF52Bluetooth.h"
+#include "BLEDfuSecure.h"
 #include "BluetoothCommon.h"
 #include "PowerFSM.h"
 #include "configuration.h"
@@ -7,7 +8,6 @@
 #include "mesh/mesh-pb-constants.h"
 #include <bluefruit.h>
 #include <utility/bonding.h>
-#include "BLEDfuSecure.h"
 static BLEService meshBleService = BLEService(BLEUuid(MESH_SERVICE_UUID_16));
 static BLECharacteristic fromNum = BLECharacteristic(BLEUuid(FROMNUM_UUID_16));
 static BLECharacteristic fromRadio = BLECharacteristic(BLEUuid(FROMRADIO_UUID_16));
@@ -16,9 +16,12 @@ static BLECharacteristic logRadio = BLECharacteristic(BLEUuid(LOGRADIO_UUID_16))
 
 static BLEDis bledis; // DIS (Device Information Service) helper class instance
 static BLEBas blebas; // BAS (Battery Service) helper class instance
-
+#ifndef BLE_DFU_SECURE
 static BLEDfu bledfu; // DFU software update helper service
-static BLEDfuSecure bledfusecure; // DFU software update helper service
+#else
+static BLEDfuSecure bledfusecure;                                             // DFU software update helper service
+#endif
+
 // This scratch buffer is used for various bluetooth reads/writes - but it is safe because only one bt operation can be in
 // process at once
 // static uint8_t trBytes[_max(_max(_max(_max(ToRadio_size, RadioConfig_size), User_size), MyNodeInfo_size), FromRadio_size)];
@@ -52,7 +55,6 @@ static BluetoothPhoneAPI *bluetoothPhoneAPI;
 
 void onConnect(uint16_t conn_handle)
 {
-
     // Get the reference to current connection
     BLEConnection *connection = Bluefruit.Connection(conn_handle);
     connectionHandle = conn_handle;
@@ -67,8 +69,10 @@ void onConnect(uint16_t conn_handle)
  */
 void onDisconnect(uint16_t conn_handle, uint8_t reason)
 {
-    // FIXME - we currently assume only one active connection
     LOG_INFO("BLE Disconnected, reason = 0x%x\n", reason);
+    if (bluetoothPhoneAPI) {
+        bluetoothPhoneAPI->close();
+    }
 }
 void onCccd(uint16_t conn_hdl, BLECharacteristic *chr, uint16_t cccd_value)
 {
@@ -137,10 +141,19 @@ void onFromRadioAuthorize(uint16_t conn_hdl, BLECharacteristic *chr, ble_gatts_e
     }
     authorizeRead(conn_hdl);
 }
+// Last ToRadio value received from the phone
+static uint8_t lastToRadio[MAX_TO_FROM_RADIO_SIZE];
+
 void onToRadioWrite(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, uint16_t len)
 {
     LOG_INFO("toRadioWriteCb data %p, len %u\n", data, len);
-    bluetoothPhoneAPI->handleToRadio(data, len);
+    if (memcmp(lastToRadio, data, len) != 0) {
+        LOG_DEBUG("New ToRadio packet\n");
+        memcpy(lastToRadio, data, len);
+        bluetoothPhoneAPI->handleToRadio(data, len);
+    } else {
+        LOG_DEBUG("Dropping duplicate ToRadio packet we just saw\n");
+    }
 }
 
 void setupMeshService(void)
@@ -195,8 +208,13 @@ void NRF52Bluetooth::shutdown()
 {
     // Shutdown bluetooth for minimum power draw
     LOG_INFO("Disable NRF52 bluetooth\n");
-    if (connectionHandle != 0) {
-        Bluefruit.disconnect(connectionHandle);
+    uint8_t connection_num = Bluefruit.connected();
+    if (connection_num) {
+        for (uint8_t i = 0; i < connection_num; i++) {
+            LOG_INFO("NRF52 bluetooth disconnecting handle %d\n", i);
+            Bluefruit.disconnect(i);
+        }
+        delay(100); // wait for ondisconnect;
     }
     Bluefruit.Advertising.stop();
 }
@@ -249,10 +267,13 @@ void NRF52Bluetooth::setup()
     // Set the connect/disconnect callback handlers
     Bluefruit.Periph.setConnectCallback(onConnect);
     Bluefruit.Periph.setDisconnectCallback(onDisconnect);
-    // bledfu.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
-    // bledfu.begin(); // Install the DFU helper
-    bledfusecure.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); 
-    bledfusecure.begin(); // Install the DFU helper
+#ifndef BLE_DFU_SECURE
+    bledfu.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
+    bledfu.begin(); // Install the DFU helper
+#else
+    bledfusecure.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); // add by WayenWeng
+    bledfusecure.begin();                                                     // Install the DFU helper
+#endif
     // Configure and Start the Device Information Service
     LOG_INFO("Configuring the Device Information Service\n");
     bledis.setModel(optstr(HW_VERSION));
@@ -299,6 +320,7 @@ bool NRF52Bluetooth::onPairingPasskey(uint16_t conn_handle, uint8_t const passke
 {
     LOG_INFO("BLE pairing process started with passkey %.3s %.3s\n", passkey, passkey + 3);
     powerFSM.trigger(EVENT_BLUETOOTH_PAIR);
+#if !defined(MESHTASTIC_EXCLUDE_SCREEN)
     screen->startAlert([](OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y) -> void {
         char btPIN[16] = "888888";
         snprintf(btPIN, sizeof(btPIN), "%06u", configuredPasskey);
@@ -324,6 +346,7 @@ bool NRF52Bluetooth::onPairingPasskey(uint16_t conn_handle, uint8_t const passke
         y_offset = display->height() == 64 ? y_offset + FONT_HEIGHT_LARGE - 6 : y_offset + FONT_HEIGHT_LARGE + 5;
         display->drawString(x_offset + x, y_offset + y, deviceName);
     });
+#endif
     if (match_request) {
         uint32_t start_time = millis();
         while (millis() < start_time + 30000) {

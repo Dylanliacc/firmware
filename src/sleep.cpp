@@ -5,6 +5,8 @@
 #endif
 
 #include "ButtonThread.h"
+#include "Default.h"
+#include "Led.h"
 #include "MeshRadio.h"
 #include "MeshService.h"
 #include "NodeDB.h"
@@ -16,6 +18,7 @@
 #include "target_specific.h"
 
 #ifdef ARCH_ESP32
+// "esp_pm_config_esp32_t is deprecated, please include esp_pm.h and use esp_pm_config_t instead"
 #include "esp32/pm.h"
 #include "esp_pm.h"
 #if HAS_WIFI
@@ -27,6 +30,7 @@
 
 esp_sleep_source_t wakeCause; // the reason we booted this time
 #endif
+#include "Throttle.h"
 
 #ifndef INCLUDE_vTaskSuspend
 #define INCLUDE_vTaskSuspend 0
@@ -78,26 +82,6 @@ void setCPUFast(bool on)
     setCpuFrequencyMhz(on ? 240 : 80);
 #endif
 
-#endif
-}
-
-void setLed(bool ledOn)
-{
-    if (ledOn)
-        powerMon->setState(meshtastic_PowerMon_State_LED_On);
-    else
-        powerMon->clearState(meshtastic_PowerMon_State_LED_On);
-
-#ifdef LED_PIN
-    // toggle the led so we can get some rough sense of how often loop is pausing
-    digitalWrite(LED_PIN, ledOn ^ LED_INVERTED);
-#endif
-
-#ifdef HAS_PMU
-    if (pmu_found && PMU) {
-        // blink the axp led
-        PMU->setChargingLedMode(ledOn ? XPOWERS_CHG_LED_ON : XPOWERS_CHG_LED_OFF);
-    }
 #endif
 }
 
@@ -187,7 +171,8 @@ static void waitEnterSleep(bool skipPreflight = false)
         while (!doPreflightSleep()) {
             delay(100); // Kinda yucky - wait until radio says say we can shutdown (finished in process sends/receives)
 
-            if (millis() - now > 30 * 1000) { // If we wait too long just report an error and go to sleep
+            if (!Throttle::isWithinTimespanMs(now,
+                                              THIRTY_SECONDS_MS)) { // If we wait too long just report an error and go to sleep
                 RECORD_CRITICALERROR(meshtastic_CriticalErrorCode_SLEEP_ENTER_WAIT);
                 assert(0); // FIXME - for now we just restart, need to fix bug #167
                 break;
@@ -230,6 +215,8 @@ void doDeepSleep(uint32_t msecToWake, bool skipPreflight = false)
     notifyDeepSleep.notifyObservers(NULL);
 #endif
 
+    powerMon->setState(meshtastic_PowerMon_State_CPU_DeepSleep);
+
     screen->doDeepSleep(); // datasheet says this will draw only 10ua
 
     nodeDB->saveToDisk();
@@ -239,7 +226,8 @@ void doDeepSleep(uint32_t msecToWake, bool skipPreflight = false)
     // pinMode(PIN_POWER_EN1, INPUT_PULLDOWN);
 #endif
 
-#ifdef GNSS_Airoha 
+#ifdef TRACKER_T1000_E
+#ifdef GNSS_AIROHA
     digitalWrite(GPS_VRTC_EN, LOW);
     digitalWrite(PIN_GPS_RESET, LOW);
     digitalWrite(GPS_SLEEP_INT, LOW);
@@ -248,29 +236,22 @@ void doDeepSleep(uint32_t msecToWake, bool skipPreflight = false)
     digitalWrite(GPS_RESETB_OUT, LOW);
 #endif
 
-#ifdef BUZZER_EN_PIN 
+#ifdef BUZZER_EN_PIN
     digitalWrite(BUZZER_EN_PIN, LOW);
 #endif
 
-#ifdef PIN_3V3_EN 
+#ifdef PIN_3V3_EN
     digitalWrite(PIN_3V3_EN, LOW);
 #endif
-
-    setLed(false);
+#endif
+    ledBlink.set(false);
 
 #ifdef RESET_OLED
     digitalWrite(RESET_OLED, 1); // put the display in reset before killing its power
 #endif
 
-#if defined(VEXT_ENABLE_V03)
-    digitalWrite(VEXT_ENABLE_V03, 1); // turn off the display power
-#elif defined(VEXT_ENABLE_V05)
-    digitalWrite(VEXT_ENABLE_V05, 0); // turn off the lora amplifier power
-    digitalWrite(ST7735_BL_V05, 0);   // turn off the display power
-#elif defined(VEXT_ENABLE) && defined(VEXT_ON_VALUE)
+#if defined(VEXT_ENABLE)
     digitalWrite(VEXT_ENABLE, !VEXT_ON_VALUE); // turn on the display power
-#elif defined(VEXT_ENABLE)
-    digitalWrite(VEXT_ENABLE, 1); // turn off the display power
 #endif
 
 #ifdef ARCH_ESP32
@@ -329,6 +310,14 @@ void doDeepSleep(uint32_t msecToWake, bool skipPreflight = false)
             PMU->shutdown();
         }
     }
+#endif
+
+#if defined(ARCH_ESP32) && defined(I2C_SDA)
+    // Added by https://github.com/meshtastic/firmware/pull/4418
+    // Possibly to support Heltec Capsule Sensor?
+    Wire.end();
+    pinMode(I2C_SDA, ANALOG);
+    pinMode(I2C_SCL, ANALOG);
 #endif
 
     console->flush();
@@ -462,12 +451,17 @@ esp_sleep_wakeup_cause_t doLightSleep(uint64_t sleepMsec) // FIXME, use a more r
  */
 void enableModemSleep()
 {
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    static esp_pm_config_t esp32_config; // filled with zeros because bss
+#else
     static esp_pm_config_esp32_t esp32_config; // filled with zeros because bss
-
+#endif
 #if CONFIG_IDF_TARGET_ESP32S3
     esp32_config.max_freq_mhz = CONFIG_ESP32S3_DEFAULT_CPU_FREQ_MHZ;
 #elif CONFIG_IDF_TARGET_ESP32S2
     esp32_config.max_freq_mhz = CONFIG_ESP32S2_DEFAULT_CPU_FREQ_MHZ;
+#elif CONFIG_IDF_TARGET_ESP32C6
+    esp32_config.max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
 #elif CONFIG_IDF_TARGET_ESP32C3
     esp32_config.max_freq_mhz = CONFIG_ESP32C3_DEFAULT_CPU_FREQ_MHZ;
 #else

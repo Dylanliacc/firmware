@@ -355,7 +355,7 @@ ExternalNotificationModule::ExternalNotificationModule()
 
     if (moduleConfig.external_notification.enabled) {
         if (nodeDB->loadProto(rtttlConfigFile, meshtastic_RTTTLConfig_size, sizeof(meshtastic_RTTTLConfig),
-                              &meshtastic_RTTTLConfig_msg, &rtttlConfig) != LoadFileResult::SUCCESS) {
+                              &meshtastic_RTTTLConfig_msg, &rtttlConfig) != LoadFileResult::LOAD_SUCCESS) {
             memset(rtttlConfig.ringtone, 0, sizeof(rtttlConfig.ringtone));
             strncpy(rtttlConfig.ringtone,
                     "24:d=32,o=5,b=565:f6,p,f6,4p,p,f6,p,f6,2p,p,b6,p,b6,p,b6,p,b6,p,b,p,b,p,b,p,b,p,b,p,b,p,b,p,b,1p.,2p.,p",
@@ -428,7 +428,7 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
         drv.setWaveform(2, 0);
         drv.go();
 #endif
-        if (getFrom(&mp) != nodeDB->getNodeNum()) {
+        if (!isFromUs(&mp)) {
             // Check if the message contains a bell character. Don't do this loop for every pin, just once.
             auto &p = mp.decoded;
             bool containsBell = false;

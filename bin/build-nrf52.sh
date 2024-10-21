@@ -11,7 +11,7 @@ rm -f $OUTDIR/firmware*
 rm -r $OUTDIR/* || true
 
 # Important to pull latest version of libs into all device flavors, otherwise some devices might be stale
-platformio pkg update
+platformio pkg update -e $1
 
 echo "Building for $1 with $PLATFORMIO_BUILD_FLAGS"
 rm -f .pio/build/$1/firmware.*
@@ -35,7 +35,6 @@ SRCHEX=.pio/build/$1/firmware.hex
 # if WM1110 target, merge hex with softdevice 7.3.0
 if (echo $1 | grep -q "wio-sdk-wm1110"); then
 	echo "Merging with softdevice"
-	sudo chmod +x ./bin/mergehex
 	bin/mergehex -m bin/s140_nrf52_7.3.0_softdevice.hex $SRCHEX -o .pio/build/$1/$basename.hex
 	SRCHEX=.pio/build/$1/$basename.hex
 	bin/uf2conv.py $SRCHEX -c -o $OUTDIR/$basename.uf2 -f 0xADA52840
@@ -46,4 +45,9 @@ else
 	cp bin/device-install.* $OUTDIR
 	cp bin/device-update.* $OUTDIR
 	cp bin/*.uf2 $OUTDIR
+fi
+
+if (echo $1 | grep -q "rak4631"); then
+	echo "Copying hex file"
+	cp .pio/build/$1/firmware.hex $OUTDIR/$basename.hex
 fi

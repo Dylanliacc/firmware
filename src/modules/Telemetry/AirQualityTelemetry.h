@@ -10,6 +10,10 @@
 
 class AirQualityTelemetryModule : private concurrency::OSThread, public ProtobufModule<meshtastic_Telemetry>
 {
+    CallbackObserver<AirQualityTelemetryModule, const meshtastic::Status *> nodeStatusObserver =
+        CallbackObserver<AirQualityTelemetryModule, const meshtastic::Status *>(this,
+                                                                                &AirQualityTelemetryModule::handleStatusUpdate);
+
   public:
     AirQualityTelemetryModule()
         : concurrency::OSThread("AirQualityTelemetryModule"),
@@ -18,6 +22,7 @@ class AirQualityTelemetryModule : private concurrency::OSThread, public Protobuf
         lastMeasurementPacket = nullptr;
         setIntervalFromNow(10 * 1000);
         aqi = Adafruit_PM25AQI();
+        nodeStatusObserver.observe(&nodeStatus->onNewStatus);
     }
 
   protected:
@@ -39,7 +44,7 @@ class AirQualityTelemetryModule : private concurrency::OSThread, public Protobuf
   private:
     Adafruit_PM25AQI aqi;
     PM25_AQI_Data data = {0};
-    bool firstTime = 1;
+    bool firstTime = true;
     meshtastic_MeshPacket *lastMeasurementPacket;
     uint32_t sendToPhoneIntervalMs = SECONDS_IN_MINUTE * 1000; // Send to phone every minute
     uint32_t lastSentToMesh = 0;
