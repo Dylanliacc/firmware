@@ -44,6 +44,8 @@
 #define GPS_TX_PIN 19
 #define HAS_GPS 1
 
+#define GPS_Default_GpsMode_NOT_PRESENT
+
 #define USE_SX1262
 #define USE_SX1268
 
