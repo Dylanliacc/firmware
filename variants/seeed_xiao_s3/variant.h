@@ -51,6 +51,7 @@ L76K GPS Module Information : https://www.seeedstudio.com/L76K-GNSS-Module-for-S
 #define PIN_SERIAL1_RX PIN_GPS_TX
 #define PIN_SERIAL1_TX PIN_GPS_RX
 #define PIN_GPS_STANDBY 1
+#define GPS_Default_GpsMode_NOT_PRESENT
 #endif
 
 // XIAO S3 Expansion board  has 1.3 inch OLED Screen
